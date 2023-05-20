@@ -7,17 +7,20 @@
 #include <linux/module.h>   
 #include <linux/fs.h>       
 #include <linux/uaccess.h> 
-#include <linux/string.h>  
-#include ״message_slot.h״
+#include <linux/string.h> 
+#include <linux/slab.h> 
+#include "message_slot.h"
+
 
 MODULE_LICENSE("GPL");
 
-static SLOT HEAD;
+static SLOT *HEAD;
 void slot_insert(SLOT *new){
     if (HEAD == NULL){
         HEAD = new;
     }
     else{
+        printk("inserting new slot");
         HEAD->prev = new;
         new->next = HEAD;
         HEAD = new;
@@ -25,8 +28,10 @@ void slot_insert(SLOT *new){
 }
 
 void channel_insert(SLOT *slot, CHANNEL *channel){
+    printk("inserting channel %lu", channel->id);
     if (slot->head == NULL){
-        slot->head == channel;
+        slot->head = channel;
+        printk("inserted as a new channel");
     }
     else{
         (slot->head)->prev = channel;
@@ -85,7 +90,7 @@ static int device_open( struct inode* inode,
     int minor;
     SLOT *new;
     minor = iminor(inode);
-    if (minor_lookup(minor)) == NULL){
+    if (minor_lookup(minor) == NULL){
         new = (SLOT*)kmalloc(sizeof(SLOT),GFP_KERNEL);
         if (new == NULL){
         printk("An allocating memory error has occurred");
@@ -101,8 +106,11 @@ static int device_open( struct inode* inode,
 
 static ssize_t device_read( struct file* file, char __user* buffer, size_t length, loff_t* offset){
     CHANNEL *channel; 
-    channel = (CHANNEL*) file->private_data;
     int i;
+
+    channel = (CHANNEL*) file->private_data;
+    printk("reading from channel %lu",channel->id);
+    printk("the channel's message while reading is %s", channel->buf);
     if (channel == NULL){
         printk("No channel has been set on the file descriptor");
         return -EINVAL;
@@ -116,8 +124,8 @@ static ssize_t device_read( struct file* file, char __user* buffer, size_t lengt
         return -ENOSPC;
     }
     for (i=0; i < length; i++){
-        if(get_user((channel->buf)[i], &buffer[i])<0){
-            printk("An error in put_user has Occurred")
+        if(put_user((channel->buf)[i], &buffer[i])<0){
+            printk("An error in put_user has Occurred");
             return -EFAULT;
         }
     }  
@@ -127,7 +135,8 @@ static ssize_t device_read( struct file* file, char __user* buffer, size_t lengt
 static ssize_t device_write( struct file* file, const char __user* buffer, size_t length,loff_t* offset) {
     char *tmp, *new;
     int i;
-    CHANNEL *channel, *new;
+    CHANNEL *channel;
+    printk("made it to write");
     channel = (CHANNEL*) file->private_data;
     if (channel == NULL){
         printk("No channel has been set on the file descriptor");
@@ -135,7 +144,7 @@ static ssize_t device_write( struct file* file, const char __user* buffer, size_
     }
     if ((length <= 0) || (length > BUF_LEN)){
         printk("Message length is invalid");
-        return -EMGSIZE;
+        return -EMSGSIZE;
     }
     tmp = channel -> buf;
     new = kmalloc(length*sizeof(char), GFP_KERNEL);
@@ -149,14 +158,17 @@ static ssize_t device_write( struct file* file, const char __user* buffer, size_
             return -EFAULT;
         }
     }
+    printk("write checks went ok");
     channel->buf = new;
     channel->active_msg_len = length;
     kfree(tmp);
+    printk("the channel's message while writing is %s", channel->buf);
     return length;
 }
 static long device_ioctl( struct   file* file, unsigned int   ioctl_command_id, unsigned long  ioctl_param ){
     CHANNEL *active_channel;
     SLOT *slot;
+    printk("made it into ioctl");
     if (ioctl_command_id != MSG_SLOT_CHANNEL){
         printk("Not an appropriate command");
         return -EINVAL;
@@ -172,10 +184,12 @@ static long device_ioctl( struct   file* file, unsigned int   ioctl_command_id, 
     }
 
     active_channel = set_channel(slot, ioctl_param);
+    printk("active channel id is %lu",active_channel->id);
     if (active_channel == NULL){
         printk("An allocating memory error has occurred");
         return -ENOMEM; 
     }
+    printk("head channel is %lu", HEAD->head->id);
     file->private_data = active_channel;
     return 0;
 }
@@ -186,7 +200,7 @@ struct file_operations Fops = {
   .read           = device_read,
   .write          = device_write,
   .open           = device_open,
-  .ioctl          = device_ioctl,
+  .unlocked_ioctl = device_ioctl,
 };
 
 static int __init simple_init(void){
@@ -196,6 +210,13 @@ static int __init simple_init(void){
         printk(KERN_ALERT "%s registraion failed for  %d\n",DEVICE_FILE_NAME, MAJOR_NUM );
         return rc;
     }
+    printk( "Registeration is successful. ");
+    printk( "If you want to talk to the device driver,\n" );
+    printk( "you have to create a device file:\n" );
+    printk( "mknod /dev/%s c %d 0\n", DEVICE_FILE_NAME, MAJOR_NUM );
+    printk( "You can echo/cat to/from the device file.\n" );
+    printk( "Dont forget to rm the device file and "
+            "rmmod when you're done\n" );
     HEAD = NULL;
     return 0;
 }

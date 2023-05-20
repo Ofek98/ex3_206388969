@@ -3,17 +3,18 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <stdlib.h>
-#include ״message_slot.h״
+#include <errno.h>
+#include <fcntl.h>
+#include "message_slot.h"
 
 
 void exit_and_print_errno(){
     fprintf(stderr,"%s\n", strerror(errno));
-    return 1;
+    exit(1);
 }
 
 int main (int argc, char **argv){
     int fd;
-    size_t length;
     if (argc != 4){
         fprintf(stderr,"%s\n", strerror(EINVAL));
         return 1;
