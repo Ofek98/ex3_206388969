@@ -125,7 +125,7 @@ static ssize_t device_read( struct file* file, char __user* buffer, size_t lengt
         printk("Buffer is too small to hold channel's active message");
         return -ENOSPC;
     }
-    for (i=0; i < length; i++){
+    for (i=0; i < channel->active_msg_len; i++){
         if(put_user((channel->buf)[i], &buffer[i])<0){
             printk("An error in put_user has Occurred");
             return -EFAULT;
