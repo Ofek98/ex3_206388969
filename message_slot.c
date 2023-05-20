@@ -47,6 +47,7 @@ SLOT* minor_lookup(int minor){
         if (curr->minor == minor){
             return curr;
         }
+        curr = curr->next;
     }
     return NULL;
 }
@@ -58,6 +59,7 @@ CHANNEL* set_channel(SLOT* slot, unsigned long channel_id){
         if (curr->id == channel_id){
             return curr;
         }
+        curr = curr->next;
     }
     new = (CHANNEL*) kmalloc(sizeof(CHANNEL),GFP_KERNEL);
     if (new == NULL){
@@ -100,6 +102,7 @@ static int device_open( struct inode* inode,
         new->head = NULL;
         slot_insert(new);
     }
+    file->private_data = NULL;
     return 0;
 }
 
@@ -109,10 +112,9 @@ static ssize_t device_read( struct file* file, char __user* buffer, size_t lengt
     int i;
 
     channel = (CHANNEL*) file->private_data;
-    printk("reading from channel %lu",channel->id);
-    printk("the channel's message while reading is %s", channel->buf);
     if (channel == NULL){
         printk("No channel has been set on the file descriptor");
+        printk(".");
         return -EINVAL;
     }
     if (channel->active_msg_len == 0){
@@ -162,9 +164,9 @@ static ssize_t device_write( struct file* file, const char __user* buffer, size_
     channel->buf = new;
     channel->active_msg_len = length;
     kfree(tmp);
-    printk("the channel's message while writing is %s", channel->buf);
     return length;
 }
+
 static long device_ioctl( struct   file* file, unsigned int   ioctl_command_id, unsigned long  ioctl_param ){
     CHANNEL *active_channel;
     SLOT *slot;
@@ -184,12 +186,10 @@ static long device_ioctl( struct   file* file, unsigned int   ioctl_command_id, 
     }
 
     active_channel = set_channel(slot, ioctl_param);
-    printk("active channel id is %lu",active_channel->id);
     if (active_channel == NULL){
         printk("An allocating memory error has occurred");
         return -ENOMEM; 
     }
-    printk("head channel is %lu", HEAD->head->id);
     file->private_data = active_channel;
     return 0;
 }
