@@ -38,7 +38,7 @@ int main (int argc, char **argv){
     if (close(fd) < 0){
         exit_and_print_errno();
     }
-    if (write(STDOUT_FILENO, buf, msg_len) < msg_len){
+    if (write(STDOUT_FILENO, buf, msg_len) != msg_len){
         exit_and_print_errno();
     }
     return 0;

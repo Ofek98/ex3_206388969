@@ -25,6 +25,4 @@ typedef struct slot{
     struct channel *head;
 }SLOT;
 
-void exit_and_print_errno(void);
-
 #endif
