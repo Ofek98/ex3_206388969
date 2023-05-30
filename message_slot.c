@@ -20,7 +20,6 @@ void slot_insert(SLOT *new){
         HEAD = new;
     }
     else{
-        printk("inserting new slot");
         HEAD->prev = new;
         new->next = HEAD;
         HEAD = new;
@@ -28,10 +27,8 @@ void slot_insert(SLOT *new){
 }
 
 void channel_insert(SLOT *slot, CHANNEL *channel){
-    printk("inserting channel %lu", channel->id);
     if (slot->head == NULL){
         slot->head = channel;
-        printk("inserted as a new channel");
     }
     else{
         (slot->head)->prev = channel;
@@ -95,8 +92,7 @@ static int device_open( struct inode* inode,
     if (minor_lookup(minor) == NULL){
         new = (SLOT*)kmalloc(sizeof(SLOT),GFP_KERNEL);
         if (new == NULL){
-        printk("An allocating memory error has occurred");
-        return -ENOMEM; 
+            return -ENOMEM; 
     }
         new->minor = minor;
         new->head = NULL;
@@ -110,24 +106,31 @@ static int device_open( struct inode* inode,
 static ssize_t device_read( struct file* file, char __user* buffer, size_t length, loff_t* offset){
     CHANNEL *channel; 
     int i;
+    char *new;
 
     channel = (CHANNEL*) file->private_data;
+    
     if (channel == NULL){
-        printk("No channel has been set on the file descriptor");
-        printk(".");
         return -EINVAL;
     }
     if (channel->active_msg_len == 0){
-        printk("No message exists on the channel");
         return -EWOULDBLOCK;
     }
     if (length < channel->active_msg_len){
-        printk("Buffer is too small to hold channel's active message");
         return -ENOSPC;
     }
+    new = (char*) kmalloc(BUF_LEN*sizeof(char), GFP_KERNEL);
+    if (new == NULL){
+        return -ENOMEM; 
+    }
+    for (i=0; i<BUF_LEN; i++){
+        if (get_user(new[i], &buffer[i])<0){
+            return -EFAULT;
+        }
+    }
+    kfree(new);
     for (i=0; i < channel->active_msg_len; i++){
         if(put_user((channel->buf)[i], &buffer[i])<0){
-            printk("An error in put_user has Occurred");
             return -EFAULT;
         }
     }  
@@ -138,29 +141,23 @@ static ssize_t device_write( struct file* file, const char __user* buffer, size_
     char *tmp, *new;
     int i;
     CHANNEL *channel;
-    printk("made it to write");
     channel = (CHANNEL*) file->private_data;
     if (channel == NULL){
-        printk("No channel has been set on the file descriptor");
         return -EINVAL;
     }
     if ((length <= 0) || (length > BUF_LEN)){
-        printk("Message length is invalid");
         return -EMSGSIZE;
     }
     tmp = channel -> buf;
-    new = kmalloc(length*sizeof(char), GFP_KERNEL);
+    new = (char*) kmalloc(length*sizeof(char), GFP_KERNEL);
     if (new == NULL){
-        printk("An allocating memory error has occurred");
         return -ENOMEM; 
     }
     for (i=0; i<length; i++){
         if (get_user(new[i], &buffer[i])<0){
-            printk("An error in get_user has occurred");
             return -EFAULT;
         }
     }
-    printk("write checks went ok");
     channel->buf = new;
     channel->active_msg_len = length;
     kfree(tmp);
@@ -170,24 +167,19 @@ static ssize_t device_write( struct file* file, const char __user* buffer, size_
 static long device_ioctl( struct   file* file, unsigned int   ioctl_command_id, unsigned long  ioctl_param ){
     CHANNEL *active_channel;
     SLOT *slot;
-    printk("made it into ioctl");
     if (ioctl_command_id != MSG_SLOT_CHANNEL){
-        printk("Not an appropriate command");
         return -EINVAL;
     }
     if (ioctl_param == 0){
-        printk("Invalid channel id");
         return -EINVAL;
     }
     slot = minor_lookup(iminor(file->f_inode));
     if (slot == NULL){
-        printk("File has no opened slot");
         return -EFAULT;
     }
 
     active_channel = set_channel(slot, ioctl_param);
     if (active_channel == NULL){
-        printk("An allocating memory error has occurred");
         return -ENOMEM; 
     }
     file->private_data = active_channel;
@@ -210,13 +202,6 @@ static int __init simple_init(void){
         printk(KERN_ALERT "%s registraion failed for  %d\n",DEVICE_FILE_NAME, MAJOR_NUM );
         return rc;
     }
-    printk( "Registeration is successful. ");
-    printk( "If you want to talk to the device driver,\n" );
-    printk( "you have to create a device file:\n" );
-    printk( "mknod /dev/%s c %d 0\n", DEVICE_FILE_NAME, MAJOR_NUM );
-    printk( "You can echo/cat to/from the device file.\n" );
-    printk( "Dont forget to rm the device file and "
-            "rmmod when you're done\n" );
     HEAD = NULL;
     return 0;
 }

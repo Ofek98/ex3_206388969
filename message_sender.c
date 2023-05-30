@@ -15,6 +15,7 @@ void exit_and_print_errno(){
 
 int main (int argc, char **argv){
     int fd;
+    long channel_id;
     if (argc != 4){
         fprintf(stderr,"%s\n", strerror(EINVAL));
         return 1;
@@ -23,7 +24,14 @@ int main (int argc, char **argv){
     if (fd <0){
         exit_and_print_errno();
     }
-    if (ioctl(fd,MSG_SLOT_CHANNEL, atoi(argv[2]))<0){
+
+    channel_id = strtol(argv[2],NULL,10);
+    if (channel_id <= 0){
+        fprintf(stderr,"%s\n", strerror(EINVAL));
+        return 1;
+    }
+
+    if (ioctl(fd,MSG_SLOT_CHANNEL, channel_id)<0){
         exit_and_print_errno();
     } 
 
